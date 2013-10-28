@@ -54,3 +54,12 @@ def build(where, who, pword):
     factory = client.basicClientFactory(myJid, pword)
     factory.addBootstrap('//event/stream/authd',authd)
     reactor.connectTCP(where,5222,factory)
+
+def relay(target):
+    registry = CommandRegistry.getRegistry()
+    def inner_relay(msg):
+        message = domish.Element((None, 'message'))
+        message['to'] = target
+        message.addElement('body', content=msg.strip())
+        registry.jabber.send(message)
+    return inner_relay
