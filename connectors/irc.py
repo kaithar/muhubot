@@ -4,7 +4,7 @@ from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol
 from internals.commandRegistry import CommandRegistry
 
-import re
+import re, codecs
 
 class IrcBot(irc.IRCClient):
     """Expose stuff to irc"""
@@ -13,6 +13,7 @@ class IrcBot(irc.IRCClient):
     
     def connectionMade(self):
         irc.IRCClient.connectionMade(self)
+        self.factory.ircclient = self
 
     def connectionLost(self, reason):
         irc.IRCClient.connectionLost(self, reason)
@@ -72,6 +73,13 @@ class IrcBotFactory(protocol.ClientFactory):
         self.channel = channel
         self.usermap = usermap
 
+    def relay(self, channel):
+        def inner_relay(message):
+            msg = codecs.lookup("unicode_escape").encode(message)[0]
+            for l in msg.split(r"\n"):
+                self.ircclient.msg(channel, l)
+        return inner_relay
+
     def buildProtocol(self, addr):
         p = IrcBot()
         p.factory = self
@@ -92,3 +100,4 @@ class IrcBotFactory(protocol.ClientFactory):
 def build(name, server, channel, usermap = {}, port=6667, ssl=False):
     f = IrcBotFactory(name, channel, usermap)
     reactor.connectTCP(server, port, f)
+    return f
