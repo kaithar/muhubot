@@ -5,6 +5,7 @@ class CommandRegistry(object):
     irc = None
     instructions = None
     help = None
+    websinks = None
     @staticmethod
     def getRegistry():
         if CommandRegistry.singleton == None:
@@ -12,6 +13,7 @@ class CommandRegistry(object):
             CommandRegistry.singleton.irc = []
             CommandRegistry.singleton.instructions = []
             CommandRegistry.singleton.help = ["help - show this list",]
+            CommandRegistry.singleton.websinks = []
         return CommandRegistry.singleton
 
     def registerInstruction(self, express, callback, help = []):
@@ -19,6 +21,9 @@ class CommandRegistry(object):
         if help:
             self.help.extend(help)
             self.help.sort()
+
+    def registerWebSink(self, express, callback):
+        self.websinks.append((express, callback))
 
     def showHelp(self):
         return {'success': True, 'answer': "Help text:\n" + "\n".join(CommandRegistry.singleton.help)}
