@@ -38,10 +38,10 @@ def authd(xmlstream):
 
 #<message
 #   xmlns='jabber:client'
-#   to='dev.hubot@m247.com'
+#   to='dev.muhubot@example.com'
 #   type='chat'
 #   id='purple9082c802'
-#   from='daniel.bradshaw@m247.com/d3d54b86'>
+#   from='daniel.bradshaw@example.com/d3d54b86'>
 #       <active xmlns='http://jabber.org/protocol/chatstates'/>
 #       <body>hi!</body>
 #</message>
