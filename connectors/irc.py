@@ -68,10 +68,11 @@ class IrcBotFactory(protocol.ClientFactory):
     """A factory for IRC connectors.
     """
 
-    def __init__(self, name, channel, usermap = {}):
+    def __init__(self, name, channel, usermap = {}, pword = ""):
         self.name = name
         self.channel = channel
         self.usermap = usermap
+        self.pword = pword
 
     def relay(self, channel):
         def inner_relay(message):
@@ -85,6 +86,7 @@ class IrcBotFactory(protocol.ClientFactory):
         p.factory = self
         p.reg = CommandRegistry.getRegistry()
         p.nickname = self.name
+        p.password = self.pword
         return p
 
     def clientConnectionLost(self, connector, reason):
@@ -97,7 +99,7 @@ class IrcBotFactory(protocol.ClientFactory):
         reactor.disconnectAll()
         tornado.ioloop.IOLoop.instance().stop()
 
-def build(name, server, channel, usermap = {}, port=6667, ssl=False):
-    f = IrcBotFactory(name, channel, usermap)
+def build(name, server, channel, usermap = {}, port=6667, ssl=False, pword=""):
+    f = IrcBotFactory(name, channel, usermap, pword)
     reactor.connectTCP(server, port, f)
     return f
