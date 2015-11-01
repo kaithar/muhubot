@@ -38,8 +38,6 @@ class IrcBot(irc.IRCClient):
             
             # Check to see if they're sending me a private message
             if channel == self.nickname:
-                msg = "It isn't nice to whisper!  Play nice with the group."
-                self.msg(user, msg)
                 return
 
             # Otherwise check to see if it is a message directed at me
