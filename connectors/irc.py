@@ -47,6 +47,8 @@ class IrcBot(irc.IRCClient):
                 msg = "%s: %s, %s" % (user , (ret['success'] and "Success" or "Failure"), ret['answer'])
                 for line in msg.strip().split("\n"):
                     self.msg(channel, line)
+            if hasattr(self.factory,"onPrivmsg"):
+                self.factory.onPrivmsg(user, channel, msg)
         except:
             traceback.print_exc(None)
 
