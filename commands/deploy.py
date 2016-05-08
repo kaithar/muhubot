@@ -26,7 +26,7 @@ def do_deploy(registry, user, instruction, match):
         return {'success': False, 'answer': "I don't currently know about %s" % project}
     target = match.group('target')
     if (target not in deployments[project].keys()):
-        return {'success': False, 'answer': "I don't currently how to deploy %s to %s" % (project, target)}
+        return {'success': False, 'answer': "I don't currently know how to deploy %s to %s" % (project, target)}
     return deployments[project][target]['helper'](deployments[project][target])
 
 def register(deps):
