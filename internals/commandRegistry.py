@@ -6,6 +6,7 @@ class CommandRegistry(object):
     instructions = None
     help = None
     websinks = None
+    blockHelp = False
     @staticmethod
     def getRegistry():
         if CommandRegistry.singleton == None:
@@ -30,7 +31,8 @@ class CommandRegistry(object):
 
     def interpret(self, user, instruction):
         if instruction.startswith("help"):
-            return self.showHelp()
+            if not blockHelp:
+                return self.showHelp()
         else:
             for (express,callback) in self.instructions:
                 match = express.match(instruction)
