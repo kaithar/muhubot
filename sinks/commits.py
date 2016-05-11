@@ -7,17 +7,20 @@ class CommitHandler(tornado.web.RequestHandler):
     def post(self):
         if (self.callbacks):
             commit = json.loads(self.request.body)
-            msg = "%s: Pushing %d commits to %s"%(
-                commit['user_name'], commit['total_commits_count'],
-                commit['repository']['name'],
-            )
-            for ct in commit['commits']:
-                msg += "\n%s: [%s] %s"%(
-                    ct['author']['name'], ct['id'][:9],
-                    ct['message']
-                   )
             for cb in self.callbacks:
-                cb(msg)
+                cb(commit)
+
+def message_formatter(jsonblock):
+    msg = "%s: Pushing %d commits to %s"%(
+        commit['user_name'], commit['total_commits_count'],
+        commit['repository']['name'],
+    )
+    for ct in commit['commits']:
+        msg += "\n%s: [%s] %s"%(
+            ct['author']['name'], ct['id'][:9],
+            ct['message']
+           )
+    return msg
 
 #{
 # "before":"374819e338845a23e9e4f2f76a659a3c8b41a534",
