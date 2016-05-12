@@ -13,13 +13,13 @@ import re
 
 deployments = None
 
-def run(target='*', instruction='test.ping', arg=None):
+def run(target='*', instruction='test.ping', cmd_arg=None):
     def salt_runner(*args, **kwargs):
         print "In salt_runner"
-        if not arg:
-            arg = ()
+        if not cmd_arg:
+            cmd_arg = ()
         client = LocalClient()
-        t = client.cmd(target, instruction, arg=arg, timeout=120)
+        t = client.cmd(target, instruction, arg=cmd_arg, timeout=120)
         ans = []
         for h,a in t.items():
             ans.append("{} responded with {}".format(h,repr(a)))
