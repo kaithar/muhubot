@@ -31,6 +31,7 @@ def do_macro(registry, user, instruction, match):
     if (macro not in deployments.keys()):
         return {'success': False, 'answer': "I don't currently know about %s" % macro}
     tgt = deployments[macro]
+    print "Starting macro %s"%macro
     client = LocalClient()
     t = client.cmd(tgt['target'], tgt['instruction'], arg=tgt['arg'], timeout=120)
     ans = []
