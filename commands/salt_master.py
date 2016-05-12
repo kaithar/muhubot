@@ -15,6 +15,7 @@ deployments = None
 
 def run(target='*', instruction='test.ping', arg=None):
     def salt_runner(*args, **kwargs):
+        print "In salt_runner"
         if not arg:
             arg = ()
         client = LocalClient()

@@ -6,8 +6,10 @@ class CommitHandler(tornado.web.RequestHandler):
     callbacks = None
     def post(self):
         if (self.callbacks):
+            print "Call backs..."
             commit = json.loads(self.request.body)
             for cb in self.callbacks:
+                print "."
                 cb(commit)
 
 def message_formatter(jsonblock):
@@ -20,6 +22,7 @@ def message_formatter(jsonblock):
             ct['author']['name'], ct['id'][:9],
             ct['message']
            )
+    print msg
     return msg
 
 #{
