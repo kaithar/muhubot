@@ -31,7 +31,7 @@ class CommandRegistry(object):
 
     def interpret(self, user, instruction):
         if instruction.startswith("help"):
-            if not blockHelp:
+            if not self.blockHelp:
                 return self.showHelp()
         else:
             for (express,callback) in self.instructions:
