@@ -12,8 +12,8 @@ class CommitHandler(tornado.web.RequestHandler):
                 print "."
                 cb(commit)
 
-def message_formatter(jsonblock):
-    print "For jsonblock %s"%repr(jsonblock)
+def message_formatter(commit):
+    print "For commit %s"%repr(commit)
     msg = "%s: Pushing %d commits to %s"%(
         commit['user_name'], commit['total_commits_count'],
         commit['repository']['name'],
