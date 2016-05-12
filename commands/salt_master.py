@@ -61,7 +61,7 @@ def do_macro(registry, user, instruction, match):
     print "Starting macro %s"%macro
     client = LocalClient()
     t = client.cmd(tgt['target'], tgt['instruction'], arg=tgt['arg'], timeout=120)
-    if (instruction == "state.sls"):
+    if (tgt['instruction'] == "state.sls"):
         ans = formatter_state(t)
     else:
         ans = formatter_raw(t)
