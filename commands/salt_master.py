@@ -32,7 +32,8 @@ def formatter_state(result):
             sp = s.split('_|-')
             a2['PF'] = 'P' if a2['result'] else 'F'
             a2['short'] = "%s.%s"%(sp[0], sp[-1])
-            state_lines.append("{start_time} {PF} {short}: {name} (took {duration}ms):\n{comment}".format(**a2))
+            a2['duration'] = int(a2['duration'])
+            state_lines.append("{PF} {short} {name}: {comment} ({duration}ms)".format(**a2))
         ans.append("{} responded with \n{}".format(h,"\n".join(state_lines)))
     return '\n'.join(ans)
 
