@@ -1,0 +1,6 @@
+futures
+PyYAML
+pyzmq
+salt
+six
+Twisted
