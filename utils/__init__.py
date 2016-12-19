@@ -25,6 +25,7 @@ class sock(object):
         self.socket = self.context.socket(zmq.DEALER)
         self.monitor = self.socket.get_monitor_socket()
         self.subs = {}
+        self.message_queue = []
         sock.singleton = self
 
     def connect(self, identity, endpoint):
@@ -59,10 +60,17 @@ class sock(object):
         sock.singleton.subscribe(channel, baked_chain_link)
         return base
 
+    def raw_send_multipart(self, safe_args):
+        if self.connected:
+            print('SENDING TO {}: {}'.format(safe_args[0], repr(safe_args[1:])[0:100]))
+            self.socket.send_multipart(safe_args)
+        else:
+            print('QUEUED FOR {}: {}'.format(safe_args[0], repr(safe_args[1:])[0:100]))
+            self.message_queue.append(safe_args)
+
     def send_multipart(self, *args):
         safe_args = [(a.encode('utf-8', 'backslashreplace') if (type(a) is self.desired_type) else a) for a in args]
-        print('SENDING TO {}: {}'.format(safe_args[0], repr(safe_args[1:])))
-        self.socket.send_multipart(safe_args)
+        self.raw_send_multipart(safe_args)
 
     def subscribe(self, channel, callback):
         channel = channel.lower()
@@ -85,7 +93,7 @@ class sock(object):
                         safe_data = [d.decode('utf-8') for d in data]
                     else:
                         safe_data = [d for d in data]
-                    print('(Thread loop) '+repr(safe_data))
+                    print('(Thread loop) '+repr(safe_data)[0:100])
                     handler = getattr(self, 'handle_{}'.format(safe_data[0]), None)
                     if handler:
                         self.call_safely(handler, safe_data)
@@ -98,10 +106,12 @@ class sock(object):
                         # Completely ignore these 3 events because they spam too much.
                         print("Event: {}".format(evt))
                         if evt['event'] == zmq.EVENT_CONNECTED:
-                            self.send_multipart('CONNECT')
                             self.connected = True
+                            self.send_multipart('CONNECT')
                             for c in self.subs:
                                 self.send_multipart('SUB', c)
+                            while self.message_queue:
+                                self.raw_send_multipart(self.message_queue.pop(0))
                         if evt['event'] == zmq.EVENT_DISCONNECTED:
                             print('DISCONNECT')
                             self.connected = False
@@ -129,15 +139,15 @@ class sock(object):
 
 
     def twisted_call_safely(self, func, args):
-        print('(Twisted_call_safely) '+repr(args))
+        print('(Twisted_call_safely) '+repr(args)[0:100])
         self.reactor.callFromThread(func, *args)
 
     def tornado_call_safely(self, func, args):
-        print('(Tornado_call_safely) '+repr(args))
+        print('(Tornado_call_safely) '+repr(args)[0:100])
         self.ioloop.add_callback(func, *args)
 
     def direct_call_safely(self, func, args):
-        print('(Direct_call_safely) '+str(func)+' '+repr(args))
+        print('(Direct_call_safely) '+str(func)+' '+repr(args)[0:100])
         func(*args)
 
     def twisted_register(self, reactor):

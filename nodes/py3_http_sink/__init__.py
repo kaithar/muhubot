@@ -2,6 +2,7 @@ from utils import sock
 zmq_sock = sock()
 import config
 
+from .base import Periodic
 import importlib
 import traceback
 import tornado.web
@@ -43,6 +44,27 @@ if getattr(config, 'http_sink', False):
                         print("Binding {} to {}".format(o, o.path))
                         o.sock = zmq_sock
                         sink_handlers.append((o.path, o))
+
+        for poller in my_config['pollers']:
+            s = None
+            try:
+                s = importlib.import_module('nodes.py3_http_sink.pollers.{}'.format(poller))
+            except:
+                traceback.print_exc(None)
+            if not s:
+                try:
+                    s = importlib.import_module('{}'.format(poller))
+                except:
+                    traceback.print_exc(None)
+            if s:
+                for on in dir(s):
+                    o = getattr(s, on)
+                    if (type(o) == type) and (issubclass(o, Periodic)):
+                        print("Creating poller {} for every {}ms".format(o, o.timeout))
+                        o.sock = zmq_sock
+                        cb = o()
+                        pc = tornado.ioloop.PeriodicCallback(cb.run, o.timeout)
+                        pc.start()
 
         if len(sink_handlers) == 0:
             print("No handlers detected")

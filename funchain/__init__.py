@@ -41,7 +41,7 @@ class Progress(object):
         self.links = chain.list
 
     def items(self):
-        print("entering")
+        #print("entering")
         for i in self.links:
             yield i
         raise StopIteration()
@@ -116,7 +116,7 @@ class Chain(object):
     def resume(self, progressor, inl):
         try:
             for i in progressor:
-                print("inl >> {}".format(inl))
+                #print("inl >> {}".format(inl))
                 if isinstance(i, Chain):
                     inl = i(inl)
                 elif isinstance(i,Mutation):
@@ -124,11 +124,11 @@ class Chain(object):
                 elif isinstance(i, Emit):
                     print('[{}] next input = {}'.format(i.text,repr(inl)))
                 else:
-                    print("huh")
+                    #print("huh")
                     for j in i:
                         try:
                             if callable(j):
-                                print("callable nested")
+                                #print("callable nested")
                                 j(inl)
                             elif isinstance(j,Mutation):
                                 j.doSomething(inl)

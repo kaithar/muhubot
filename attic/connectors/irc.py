@@ -1,10 +1,14 @@
+from __future__ import print_function
+
 import traceback
-import tornado.ioloop
+#import tornado.ioloop
 from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol
 from internals.commandRegistry import CommandRegistry
 
-import re, codecs
+import re, codecs, json
+
+from utils import sock
 
 class IrcBot(irc.IRCClient):
     """Expose stuff to irc"""
@@ -40,6 +44,10 @@ class IrcBot(irc.IRCClient):
             if channel == self.nickname:
                 return
 
+            auth_user = self.factory.usermap.get(user,"Unknown")
+
+            self.sock.send_multipart('MSG', 'input/irc/msg', json.dumps({'target': channel, 'source': user, 'authed_as':auth_user, 'msg': msg}))
+
             # Otherwise check to see if it is a message directed at me
             sec = re.match(r"@?%s ?[:,;@-]? *(?P<instruct>.*)$"%self.nickname, msg)
             if sec:
@@ -68,11 +76,22 @@ class IrcBotFactory(protocol.ClientFactory):
     """A factory for IRC connectors.
     """
 
-    def __init__(self, name, channel, usermap = {}, pword = ""):
+    def __init__(self, sock, name, channel, usermap = {}, pword = ""):
         self.name = name
         self.channel = channel
         self.usermap = usermap
         self.pword = pword
+        self.sock = sock
+        sock.subscribe('output/irc/say', self.sinkIrcSay)
+
+    def sinkIrcSay(self, cmd, channel, body):
+        # body = { 'server': 'irc.example.com', 'channel': '#moo', 'message': 'Hello you people!' }
+        trg = body.get('channel', None).encode("utf-8")
+        if trg:
+            #msg = codecs.lookup("unicode_escape").encode(body.get('message', 'Message missing?!'))[0]
+            msg = body.get('message', 'Message missing?!').encode("utf-8")
+            for l in msg.split(r"\n"):
+                self.ircclient.msg(trg, l)
 
     def relay(self, channel):
         def inner_relay(message):
@@ -87,6 +106,7 @@ class IrcBotFactory(protocol.ClientFactory):
         p.reg = CommandRegistry.getRegistry()
         p.nickname = self.name
         p.password = self.pword
+        p.sock = self.sock
         return p
 
     def clientConnectionLost(self, connector, reason):
@@ -94,12 +114,15 @@ class IrcBotFactory(protocol.ClientFactory):
         connector.connect()
 
     def clientConnectionFailed(self, connector, reason):
-        print "connection failed:", reason
+        print("connection failed: {}".format(reason))
         reactor.fireSystemEvent('shutdown')
         reactor.disconnectAll()
         tornado.ioloop.IOLoop.instance().stop()
 
-def build(name, server, channel, usermap = {}, port=6667, ssl=False, pword=""):
-    f = IrcBotFactory(name, channel, usermap, pword)
+def build(name, server, channel, usermap = {}, port=6667, ssl=False, pword="", s=None, zmq_endpoint='tcp://127.0.0.1:5140'):
+    if not s:
+        s = sock('irc_'+server, zmq_endpoint)
+        s.twisted_register(reactor)
+    f = IrcBotFactory(s, name, channel, usermap, pword)
     reactor.connectTCP(server, port, f)
     return f

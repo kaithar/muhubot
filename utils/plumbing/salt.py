@@ -33,6 +33,7 @@ import re
 
 def register_salt_macros():
     try:
+        sock.get_sock().chain('input/salt/run') >> receiver
         from config import salt
         # salt = {
         #     'macros': {

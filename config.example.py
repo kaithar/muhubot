@@ -24,3 +24,17 @@ deploy.register(
 
 shutdown.register()
 
+irc = {
+    'nick': 'muhubot',
+    'servers': [
+        {
+            'nick': 'muhubot2', # If you want to set nick on a per server basis
+            'host': 'irc.example.com',
+            'port': 6667,
+            'ssl': False,
+            'password': "",
+            'channels': ['#coding'],
+            'usermap': {"Bob!bob@example.com": "bob@example.com"}
+        }
+    ]
+}
