@@ -21,7 +21,7 @@ def run_command(target = '*', instruction = 'test.ping', cmd_arg = None):
         global cid
         cid += 1
         my_cid = cid
-        body = { 'cid': my_cid, 'target': target, 'cmd_arg': cmd_arg }
+        body = { 'cid': my_cid, 'target': target, 'instruction': instruction, 'cmd_arg': cmd_arg }
         asc = AsyncCall()
         tracker[my_cid] = asc
         sock.get_sock().send_multipart('MSG', 'output/salt/run', json.dumps(body).encode('utf-8'))
