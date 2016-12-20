@@ -46,7 +46,12 @@ class GitlabSystemHandler(tornado.web.RequestHandler):
         'tag_push': 'input/http/gitlab_admin/tag_push'
     }
     def post(self):
-        chan = self.channels.get(self.request.body['object_kind'], None)
-        if chan:
-            self.sock.send_multipart('MSG', chan, self.request.body)
+        body = json.loads(self.request.body.decode())
+        object_kind = body.get('object_kind', None)
+        print(object_kind)
+        if (object_kind):
+            chan = self.channels.get(object_kind, None)
+            if chan:
+                self.sock.send_multipart('MSG', chan, self.request.body)
+
 
