@@ -24,7 +24,8 @@ class RSS_poller(base.Periodic):
                 d = feedparser.parse(newtarget['feed'])
                 newtarget['last'] = d
                 for item in d.entries:
-                    items[item.id] = item
+                    iid = item.get('id', item.link)
+                    items[iid] = item
         for tag in self.targets:
             if tag not in body:
                 self.sock.send_multipart('MSG', 'input/rss/config', json.dumps({'status': 'Removing feed', 'feed': self.targets[tag]['feed']}))
@@ -49,7 +50,8 @@ class RSS_poller(base.Periodic):
             old_items = t['seen']
             items = {}
             for item in d.entries:
-                if item.id not in old_items:
+                iid = item.get('id', item.link)
+                if iid not in old_items:
                     self.sock.send_multipart('MSG', 'input/http/rss', json.dumps({'tag': tag, 'item': item}))
-                items[item.id] = item
+                items[iid] = item
             t['seen'] = items
