@@ -1,7 +1,10 @@
 from time import strftime
 
 def basic_rss(body):
-    message = '[{0}] New: {1} ({2} - Updated: {3})'.format(body['tag'], body['item']['title'], body['item']['link'], strftime('%a, %d %b %Y %H:%M:%S %z', tuple(body['item']['updated_parsed'])))
+    message = '[{0}] New: {1} ({2}'.format(body['tag'], body['item']['title'], body['item']['link'])
+    if ('updated_parsed' in body['item']):
+      message += ' - Updated {}'.format(strftime('%a, %d %b %Y %H:%M:%S %z', tuple(body['item']['updated_parsed'])))
+    message += ')'
     return message
 
 def crunchyroll(body):
