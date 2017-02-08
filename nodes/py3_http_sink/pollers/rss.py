@@ -49,9 +49,16 @@ class RSS_poller(base.Periodic):
             t['last'] = d
             old_items = t['seen']
             items = {}
+            send = []
             for item in d.entries:
                 iid = item.get('id', item.link)
                 if iid not in old_items:
-                    self.sock.send_multipart('MSG', 'input/http/rss', json.dumps({'tag': tag, 'item': item}))
+                    send.append({'tag': tag, 'item': item})
+                    print("[{}] New id! {}\n".format(tag,item.title))
+                    #self.sock.send_multipart('MSG', 'input/http/rss', json.dumps({'tag': tag, 'item': item}))
                 items[iid] = item
+            if send:
+                print("Sending {} items\n".format(len(send)))
+            for item in sorted(send, key=lambda x: x['item'].title):
+                self.sock.send_multipart('MSG', 'input/http/rss', json.dumps(item))
             t['seen'] = items
