@@ -2,7 +2,7 @@ from utils import sock
 zmq_sock = sock()
 import config
 
-from .base import Periodic
+from .base import Periodic, Api
 import importlib
 import traceback
 import tornado.web
@@ -12,7 +12,7 @@ if getattr(config, 'http_sink', False):
         'zmq_endpoint': getattr(config, 'zmq_endpoint', 'tcp://127.0.0.1:5140'),
         'node_name': 'http_sink',
         'port': 8808,
-        'sinks': []
+        'sinks': [], 'pollers': [], 'apis': []
     }
     my_config.update(config.http_sink)
     if  my_config['sinks']:
@@ -65,6 +65,26 @@ if getattr(config, 'http_sink', False):
                         cb = o()
                         pc = tornado.ioloop.PeriodicCallback(cb.run, o.timeout)
                         pc.start()
+
+        for api in my_config['apis']:
+            s = None
+            try:
+                s = importlib.import_module('nodes.py3_http_sink.apis.{}'.format(api))
+            except:
+                traceback.print_exc(None)
+            if not s:
+                try:
+                    s = importlib.import_module('{}'.format(api))
+                except:
+                    traceback.print_exc(None)
+            if s:
+                for on in dir(s):
+                    o = getattr(s, on)
+                    if (type(o) == type) and (issubclass(o, Api)):
+                        print("Creating api {}".format(o))
+                        o.sock = zmq_sock
+                        cb = o()
+ 
 
         if len(sink_handlers) == 0:
             print("No handlers detected")

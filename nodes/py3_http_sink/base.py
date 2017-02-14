@@ -4,3 +4,6 @@ class Periodic(object):
     timeout = 600
     def run(self):
         pass
+
+class Api(object):
+    pass

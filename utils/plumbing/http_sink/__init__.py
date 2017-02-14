@@ -1,1 +1,1 @@
-from . import gitlab, rss
+from . import gitlab, rss, jisho
