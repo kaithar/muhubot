@@ -14,7 +14,7 @@ class RSS_poller(base.Periodic):
     def do_config(self, cmd, channel, body):
         # body = {'xkcd': {'feed': 'https://www.xkcd.com/atom.xml', 'period': 10*60}}
         for tag in body:
-            if tag not in self.targets:
+            if tag not in self.targets.keys():
                 newtarget = {'period': 10*60 }
                 newtarget.update(body[tag])
                 newtarget['due'] = newtarget['period']
@@ -32,7 +32,7 @@ class RSS_poller(base.Periodic):
                 del self.targets[tag]
 
     def run(self):
-        for tag in self.targets:
+        for tag in self.targets.keys():
             t = self.targets[tag]
             t['due'] -= 1
             if t['due'] > 0:
