@@ -1,22 +1,27 @@
 from __future__ import print_function
-from .abstraction import Irc_abstraction
+import pydle
 import traceback, re, json
 
-class standard_bot(Irc_abstraction):
+class standard_bot(pydle.Client):
     def __init__(self, sock, nickname, server, channels, port=6667, ssl=False, password="", user_map={}):
-        super(standard_bot, self).__init__(nickname, server, channels, port, ssl, password)
+        super(standard_bot, self).__init__(nickname)
+        self.server = server
+        self.want_channels = channels
+        self.port = port
+        self.ssl = ssl
+        
         self.sock = sock
         self.user_map = user_map
 
-    def on_privmsg(self, irc, user, channel, msg):
-        try:
-            """This will get called when the bot receives a message."""
-            #user = user.split('!', 1)[0]
-            
-            # Check to see if they're sending me a private message
-            if channel == self.nickname:
-                return
+    def on_connect(self):
+        super().on_connect()
+        for c in self.want_channels:
+            self.join(c)
 
+
+    def on_channel_message(self, channel, user, msg):
+        try:
+            """This will get called when the bot receives a message."""            
             auth_user = self.user_map.get(user,"Unknown")
 
             return_path = { 'to': 'output/irc/msg', 'args': {'server': self.server, 'channel': channel }}
@@ -31,4 +36,12 @@ class standard_bot(Irc_abstraction):
                     ))
         except:
             traceback.print_exc(None)
+
+    def send_msg(self, channel, message):
+        self.message(channel, message)
+
+    def relay(self, channel):
+        def inner_relay(message):
+            self.message(channel, message)
+        return inner_relay
 

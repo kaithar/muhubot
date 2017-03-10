@@ -1,3 +1,4 @@
 pyzmq
 tornado
 feedparser
+pydle
