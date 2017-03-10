@@ -1,28 +1,27 @@
-from utils import sock
-zmq_sock = sock()
+from utils.protocol import Socket
 import config
-
-from .base import Periodic, Api
-import importlib
-import traceback
-import tornado.web
 
 if getattr(config, 'http_sink', False):
     my_config = {
-        'zmq_endpoint': getattr(config, 'zmq_endpoint', 'tcp://127.0.0.1:5140'),
+        'zmq_endpoint': getattr(config, 'zmq_endpoint', 'tcp://127.0.0.1:{}'),
         'node_name': 'http_sink',
         'port': 8808,
         'sinks': [], 'pollers': [], 'apis': []
     }
     my_config.update(config.http_sink)
+    zmq_sock = Socket(my_config['node_name'], my_config['zmq_endpoint'])
+
+    import tornado.ioloop
+    ioloop = tornado.ioloop.IOLoop.current()
+    zmq_sock.tornado_register(ioloop)
+
+    from .base import Periodic, Api
+    import importlib
+    import traceback
+    import tornado.web
+
     if  my_config['sinks']:
         print('Configuring for {} sink modules'.format(len(my_config['sinks'])))
-
-        import tornado.ioloop
-        ioloop = tornado.ioloop.IOLoop.current()
-
-        zmq_sock.connect(my_config['node_name'], my_config['zmq_endpoint'])
-        zmq_sock.tornado_register(ioloop)
 
         sink_handlers = []
 
@@ -63,6 +62,7 @@ if getattr(config, 'http_sink', False):
                         print("Creating poller {} for every {}ms".format(o, o.timeout))
                         o.sock = zmq_sock
                         cb = o()
+                        print("Adding t.i.PC")
                         pc = tornado.ioloop.PeriodicCallback(cb.run, o.timeout)
                         pc.start()
 

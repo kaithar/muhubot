@@ -1,12 +1,11 @@
 from __future__ import print_function, unicode_literals
 
-from utils import sock
+from utils.protocol import Socket
 
-s = sock()
 import config
 
 my_config = {
-    'zmq_endpoint': getattr(config, 'zmq_endpoint', 'tcp://127.0.0.1:5140'),
+    'zmq_endpoint': getattr(config, 'zmq_endpoint', 'tcp://127.0.0.1:{}'),
     'node_name': 'plumbing'
 }
 try:
@@ -14,7 +13,8 @@ try:
 except:
     print("Using default options")
 
+s = Socket(my_config['node_name'], my_config['zmq_endpoint'])
+
 config.plumbing()
 
-s.connect(my_config['node_name'], my_config['zmq_endpoint'])
 s.foreground()

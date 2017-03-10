@@ -1,4 +1,4 @@
-from utils import sock
+from utils.protocol import Socket as sock
 import json
 import funchain
 

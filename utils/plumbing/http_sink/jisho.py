@@ -1,6 +1,6 @@
 from __future__ import print_function, unicode_literals
 import json
-from utils import sock
+from utils.protocol import Socket as sock
 from funchain import AsyncCall
 import traceback
 

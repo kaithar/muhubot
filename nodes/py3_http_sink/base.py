@@ -3,7 +3,7 @@
 class Periodic(object):
     timeout = 600
     def run(self):
-        pass
+    	print("Unimplemented callback")
 
 class Api(object):
     pass

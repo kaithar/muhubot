@@ -1,8 +1,12 @@
 from __future__ import print_function, unicode_literals
 import json
-from utils import sock
+from utils.protocol import Socket as sock
 from funchain import Chain, AsyncCall
 import traceback
+
+from utils.plumbing import command_registry
+import re
+
 
 tracker = {}
 feeds = {}
@@ -37,10 +41,17 @@ def rss_config(cmd, channel, body):
     global feeds
     sock.get_sock().send_multipart('MSG', body['requesting'], json.dumps(feeds))
 
+def force_feed(body):
+    # {'match': match, 'user': user, 'instruction': instruction, 'body': body, 'send_reply': send_reply}
+    sock.get_sock().msg('config/force/rss', {'tag': body['match'].group(1)})
+    return "I'll ask for you..."
+
 def register_subs():
     try:
         sock.get_sock().subscribe('config/request/rss', rss_config)
         sock.get_sock().subscribe('input/http/rss', rss_receiver)
+        command_registry.getRegistry().registerInstruction(
+            re.compile(r'rss force (.*)'), force_feed, ("rss force [tag] - If you know the tag, you can force a recheck for it",))
     except:
         print("Failed to register subscriptions")
         traceback.print_exc(None)

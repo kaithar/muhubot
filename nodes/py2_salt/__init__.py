@@ -1,7 +1,7 @@
+from __future__ import print_function, unicode_literals
 import sys, json, traceback
 
-from utils import sock
-zmq_sock = sock()
+from utils.protocol import Socket
 import config
 
 from salt.client import LocalClient
@@ -37,7 +37,7 @@ def run(target='*', instruction='test.ping', cmd_arg=None):
     if not cmd_arg:
         cmd_arg = ()
     def salt_runner(*args, **kwargs):
-        print "In salt_runner"
+        print("In salt_runner")
         client = LocalClient()
         t = client.cmd(target, instruction, arg=cmd_arg, timeout=120)
         if (instruction == "state.sls"):
@@ -67,13 +67,13 @@ def do_run(cmd, channel, body):
         zmq_sock.send_multipart('MSG', 'input/salt/run', json.dumps(result))
 
 my_config = {
-    'zmq_endpoint': getattr(config, 'zmq_endpoint', 'tcp://127.0.0.1:5140'),
+    'zmq_endpoint': getattr(config, 'zmq_endpoint', 'tcp://127.0.0.1:{}'),
     'node_name': 'salt'
 }
 if getattr(config, 'salt', False):
     my_config.update(config.salt)
 
-zmq_sock.connect(my_config['node_name'], my_config['zmq_endpoint'])
+zmq_sock = Socket(my_config['node_name'], my_config['zmq_endpoint'])
 
 zmq_sock.subscribe('output/salt/run', do_run)
 zmq_sock.foreground()
