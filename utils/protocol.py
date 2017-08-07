@@ -1,11 +1,14 @@
 from __future__ import print_function, unicode_literals
 import zmq
+import zmq.auth
+from zmq.auth.thread import ThreadAuthenticator
 from zmq.utils.monitor import recv_monitor_message
 import sys
+import os
 import json
 import time
 import multiprocessing
-
+import config
 try:
     import queue
 except ImportError:
@@ -29,6 +32,17 @@ class SockProcess(object):
     def __init__(self):
         self.subs = {}
         self.message_queue = []
+        # Based on ironhouse.py
+        base_dir = os.path.dirname(config.__file__)
+        keys_dir = os.path.join(base_dir, 'certificates')
+        self.public_keys_dir = os.path.join(base_dir, 'public_keys')
+        self.secret_keys_dir = os.path.join(base_dir, 'private_keys')
+
+        if not (os.path.exists(keys_dir) and
+                os.path.exists(self.public_keys_dir) and
+                os.path.exists(self.secret_keys_dir)):
+            logging.critical("Certificates are missing - run generate_certificates.py script first")
+            sys.exit(1)
 
     def set_queues(self, input_queue, output_queue, log_queue):
         self.input_queue = input_queue
@@ -44,6 +58,15 @@ class SockProcess(object):
         self.context = zmq.Context()
         self.log("Creating socket")
         self.socket = self.context.socket(zmq.DEALER)
+        client_secret_file = os.path.join(self.secret_keys_dir, "client.key_secret")
+        client_public, client_secret = zmq.auth.load_certificate(client_secret_file)
+        self.socket.curve_secretkey = client_secret
+        self.socket.curve_publickey = client_public
+
+        server_public_file = os.path.join(self.public_keys_dir, "server.key")
+        server_public, _ = zmq.auth.load_certificate(server_public_file)
+        # The client must know the server's public key to make a CURVE connection.
+        self.socket.curve_serverkey = server_public
         self.log("Creating monitor")
         self.monitor = self.socket.get_monitor_socket()
 
@@ -59,6 +82,15 @@ class SockProcess(object):
         while True:
             self.log("Requesting port")
             qsock = self.context.socket(zmq.REQ)
+            client_secret_file = os.path.join(self.secret_keys_dir, "client.key_secret")
+            client_public, client_secret = zmq.auth.load_certificate(client_secret_file)
+            qsock.curve_secretkey = client_secret
+            qsock.curve_publickey = client_public
+
+            server_public_file = os.path.join(self.public_keys_dir, "server.key")
+            server_public, _ = zmq.auth.load_certificate(server_public_file)
+            # The client must know the server's public key to make a CURVE connection.
+            qsock.curve_serverkey = server_public
             qsock.set(zmq.LINGER, 1)
             qsock.connect(self.endpoint.format("5141"))
             qsock.send(b'')

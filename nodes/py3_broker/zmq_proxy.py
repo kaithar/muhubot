@@ -1,17 +1,32 @@
 from __future__ import print_function, unicode_literals
 import zmq
+import zmq.auth
+from zmq.auth.thread import ThreadAuthenticator
 from zmq.utils.monitor import recv_monitor_message
 import sys
+import os
 import json
 import time
 import queue
 import multiprocessing
 import traceback
+import config
 
 class SockProcess(object):
     socket = None
     def __init__(self):
         self.ident = ""
+        # Based on ironhouse.py
+        base_dir = os.path.dirname(config.__file__)
+        keys_dir = os.path.join(base_dir, 'certificates')
+        self.public_keys_dir = os.path.join(base_dir, 'public_keys')
+        self.secret_keys_dir = os.path.join(base_dir, 'private_keys')
+
+        if not (os.path.exists(keys_dir) and
+                os.path.exists(self.public_keys_dir) and
+                os.path.exists(self.secret_keys_dir)):
+            logging.critical("Certificates are missing - run generate_certificates.py script first")
+            sys.exit(1)
 
     def set_queues(self, input_queue, output_queue, log_queue):
         self.input_queue = input_queue
@@ -26,11 +41,24 @@ class SockProcess(object):
 
     def create_socket(self):
         self.context = zmq.Context()
+        auth = ThreadAuthenticator(self.context)
+        auth.start()
+        #auth.allow('127.0.0.1')
+        # Tell authenticator to use the certificate in a directory
+        auth.configure_curve(domain='*', location=self.public_keys_dir)
+
         self.socket = self.context.socket(zmq.ROUTER)
+        self.monitor = self.socket.get_monitor_socket()
+
+        server_secret_file = os.path.join(self.secret_keys_dir, "server.key_secret")
+        server_public, server_secret = zmq.auth.load_certificate(server_secret_file)
+        self.socket.curve_secretkey = server_secret
+        self.socket.curve_publickey = server_public
+        self.socket.curve_server = True  # must come before bind
+
         self.socket.set(zmq.LINGER, 1)
         self.socket.identity = b"mom"
-        self.port = self.socket.bind_to_random_port("tcp://127.0.0.1")
-        self.monitor = self.socket.get_monitor_socket()
+        self.port = self.socket.bind_to_random_port("tcp://0.0.0.0")
         return self.port
 
     def main_loop(self, handshaking):
@@ -90,20 +118,15 @@ class Proxy(object):
     subs = None
     last_ping = 0
     def __init__(self, handshaking, input_queue, output_queue, log_queue):
-        sys.stdout = open('prox-{}.log'.format(handshaking), 'w')
-        sys.stderr = sys.stdout
-        try:
-            self.subs = []
-            # For sanity the input and output queues are reversed on the other end
-            # Our input_queue is SockProcess's output_queue
-            # The swap happens in the reversal of the first two args passed to set_queues
-            self.input_queue = input_queue
-            self.sockproc = SockProcess()
-            self.sockproc.set_queues(output_queue, input_queue, log_queue)
-            self.proc = multiprocessing.Process(
-                target=self.sockproc.main_loop,
-                args=(handshaking,),
-                daemon=True)
-            self.proc.start()
-        except:
-            sys.stderr.write(''.join(traceback.format_exc(None)))
+        self.subs = []
+        # For sanity the input and output queues are reversed on the other end
+        # Our input_queue is SockProcess's output_queue
+        # The swap happens in the reversal of the first two args passed to set_queues
+        self.input_queue = input_queue
+        self.sockproc = SockProcess()
+        self.sockproc.set_queues(output_queue, input_queue, log_queue)
+        self.proc = multiprocessing.Process(
+            target=self.sockproc.main_loop,
+            args=(handshaking,),
+            daemon=True)
+        self.proc.start()
