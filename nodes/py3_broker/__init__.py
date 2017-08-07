@@ -4,11 +4,9 @@ import json
 import pprint
 import encodings
 
-import textwrap
-import curses
 import traceback
 import sys
-
+import logging
 import zmq
 
 import multiprocessing
@@ -31,10 +29,9 @@ class server(object):
 
     def send_multipart(self, *args):
         safe_args = [(a.encode('utf-8') if type(a) is str else a) for a in args]
-        self.set_indent('{:10} <- {:6} '.format(safe_args[0].decode(), safe_args[1].decode()))
+        self.set_indent('{:12} <- {:6} '.format(safe_args[0].decode(), safe_args[1].decode()))
         if (safe_args[1] == b'PING'):
-            self.csrcn.insstr(8, 7, '{:15}'.format(safe_args[0].decode()))
-            self.csrcn.refresh()
+            self.mon.send_multipart([b'PING', safe_args[0]])
         else:
             self.log(repr(safe_args[2:]))
         self.servers[safe_args[0]].input_queue.put(safe_args)
@@ -52,8 +49,7 @@ class server(object):
 
     def handle_PONG(self, port, pa, request):
         addr, cmd = request
-        self.csrcn.insstr(9, 7, '{:15}'.format(addr.decode()))
-        self.csrcn.refresh()
+        self.mon.send_multipart([b'PONG', addr])
 
     def handle_SUB(self, port, pa, request):
         addr, cmd, chan = request
@@ -96,44 +92,20 @@ class server(object):
             indent = indent.decode()
         except:
             pass
-        self.textwrapper.initial_indent = '{:20}'.format(indent)
-        self.textwrapper.subequent_indent = ' '*max(20,len(indent))
-        lines = self.textwrapper.wrap(msg)
-        for l in lines:
-            self.logwin.scroll()
-            p = self.logwin.getmaxyx()
-            self.logwin.addstr(p[0]-2,1,l)
-        self.logwin.border()
-        self.logwin.refresh()
+        self.mon.send_multipart([b'LOG', indent.encode(), msg.encode()])
+        self.logger.info("%s %s", indent, msg)
 
     def set_indent(self, indent):
         self.indent = indent
-
-    def setup_screen(self):
-        self.textwrapper = textwrap.TextWrapper(width=curses.COLS-2)
-        logwin= self.csrcn.subwin(curses.LINES-10,curses.COLS-2,10,1)
-        logwin.border()
-        logwin.refresh()
-        self.csrcn.idlok(True)
-        self.csrcn.scrollok(False)
-        logwin.idlok(True)
-        logwin.scrollok(True)
-        logwin.setscrreg(1,curses.LINES-12)
-        self.logwin = logwin
-        self.csrcn.addstr(8, 1, 'PING: ')
-        self.csrcn.addstr(9, 1, 'PONG: ')
-        self.csrcn.refresh()
     
     def ticker(self, ch):
-        self.csrcn.insstr(7, 7, ch)
-        self.csrcn.refresh()
-        
+        self.mon.send_multipart([b'TICKER', ch.encode()])
 
-    def loop(self, csrcn):
-        sys.stdout = open('grr.log', 'w')
-        sys.stderr = sys.stdout
-        self.csrcn = csrcn
-        self.setup_screen()
+    def loop(self):
+        self.logger = logging.getLogger()
+        ctx = zmq.Context()
+        self.mon = ctx.socket(zmq.PUB)
+        self.mon.connect('tcp://127.0.0.1:5142')
         import multiprocessing
         from . import port_broker
         from . import zmq_proxy
@@ -230,4 +202,4 @@ class server(object):
                 pass
 
 s = server()
-curses.wrapper(s.loop)
+s.loop()
