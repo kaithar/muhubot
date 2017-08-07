@@ -40,7 +40,7 @@ def run(target='*', instruction='test.ping', cmd_arg=None):
         print("In salt_runner")
         client = LocalClient()
         t = client.cmd(target, instruction, arg=cmd_arg, timeout=120)
-        if (instruction == "state.sls"):
+        if (instruction in ("state.sls", "state.sls_id")):
             ans = formatter_state(t)
         else:
             ans = formatter_raw(t)
