@@ -9,7 +9,7 @@ if getattr(config, 'http_sink', False):
         'sinks': [], 'pollers': [], 'apis': []
     }
     my_config.update(config.http_sink)
-    zmq_sock = Socket(my_config['node_name'], my_config['zmq_endpoint'])
+    zmq_sock = Socket(my_config['node_name'], my_config['zmq_endpoint'], './client_certs')
 
     import tornado.ioloop
     ioloop = tornado.ioloop.IOLoop.current()

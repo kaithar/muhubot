@@ -13,7 +13,7 @@ try:
 except:
     print("Using default options")
 
-s = Socket(my_config['node_name'], my_config['zmq_endpoint'])
+s = Socket(my_config['node_name'], my_config['zmq_endpoint'], './client_certs')
 
 config.plumbing()
 

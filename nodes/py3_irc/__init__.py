@@ -34,7 +34,7 @@ if getattr(config, 'irc', False):
     my_config.update(config.irc)
     if my_config['servers']:
         print('Configuring for {} servers'.format(len(my_config['servers'])))
-        zmq_sock = Socket(my_config['node_name'], my_config['zmq_endpoint'])
+        zmq_sock = Socket(my_config['node_name'], my_config['zmq_endpoint'], './client_certs')
         import tornado.ioloop
         ioloop = tornado.ioloop.IOLoop.current()
         zmq_sock.tornado_register(ioloop)

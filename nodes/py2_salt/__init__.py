@@ -73,7 +73,7 @@ my_config = {
 if getattr(config, 'salt', False):
     my_config.update(config.salt)
 
-zmq_sock = Socket(my_config['node_name'], my_config['zmq_endpoint'])
+zmq_sock = Socket(my_config['node_name'], my_config['zmq_endpoint'], './client_certs')
 
 zmq_sock.subscribe('output/salt/run', do_run)
 zmq_sock.foreground()

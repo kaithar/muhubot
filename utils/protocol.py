@@ -8,7 +8,7 @@ import os
 import json
 import time
 import multiprocessing
-import config
+
 try:
     import queue
 except ImportError:
@@ -29,19 +29,13 @@ class SockProcess(object):
 
     last_activity = 0
 
-    def __init__(self):
+    def __init__(self, certificate_path):
         self.subs = {}
         self.message_queue = []
-        # Based on ironhouse.py
-        base_dir = os.path.dirname(config.__file__)
-        keys_dir = os.path.join(base_dir, 'certificates')
-        self.public_keys_dir = os.path.join(base_dir, 'public_keys')
-        self.secret_keys_dir = os.path.join(base_dir, 'private_keys')
+        self.keys_dir = certificate_path
 
-        if not (os.path.exists(keys_dir) and
-                os.path.exists(self.public_keys_dir) and
-                os.path.exists(self.secret_keys_dir)):
-            logging.critical("Certificates are missing - run generate_certificates.py script first")
+        if not os.path.exists(self.keys_dir):
+            logging.critical("Certificates are missing")
             sys.exit(1)
 
     def set_queues(self, input_queue, output_queue, log_queue):
@@ -58,12 +52,13 @@ class SockProcess(object):
         self.context = zmq.Context()
         self.log("Creating socket")
         self.socket = self.context.socket(zmq.DEALER)
-        client_secret_file = os.path.join(self.secret_keys_dir, "client.key_secret")
+        # Based on ironhouse.py
+        client_secret_file = os.path.join(self.keys_dir, "client.key_secret")
         client_public, client_secret = zmq.auth.load_certificate(client_secret_file)
         self.socket.curve_secretkey = client_secret
         self.socket.curve_publickey = client_public
 
-        server_public_file = os.path.join(self.public_keys_dir, "server.key")
+        server_public_file = os.path.join(self.keys_dir, "server.key")
         server_public, _ = zmq.auth.load_certificate(server_public_file)
         # The client must know the server's public key to make a CURVE connection.
         self.socket.curve_serverkey = server_public
@@ -82,12 +77,12 @@ class SockProcess(object):
         while True:
             self.log("Requesting port")
             qsock = self.context.socket(zmq.REQ)
-            client_secret_file = os.path.join(self.secret_keys_dir, "client.key_secret")
+            client_secret_file = os.path.join(self.keys_dir, "client.key_secret")
             client_public, client_secret = zmq.auth.load_certificate(client_secret_file)
             qsock.curve_secretkey = client_secret
             qsock.curve_publickey = client_public
 
-            server_public_file = os.path.join(self.public_keys_dir, "server.key")
+            server_public_file = os.path.join(self.keys_dir, "server.key")
             server_public, _ = zmq.auth.load_certificate(server_public_file)
             # The client must know the server's public key to make a CURVE connection.
             qsock.curve_serverkey = server_public
@@ -227,7 +222,7 @@ class Socket(object):
     singleton = None
     subs = None
 
-    def __init__(self, identity, endpoint, delayStart=False):
+    def __init__(self, identity, endpoint, certificate_path, delayStart=False):
         global EVENT_MAP
         for name in dir(zmq):
             if name.startswith('EVENT_'):
@@ -241,7 +236,7 @@ class Socket(object):
         self.input_queue = m.Queue()
         self.output_queue = m.Queue()
         self.log_queue = m.Queue()
-        self.sockproc = SockProcess()
+        self.sockproc = SockProcess(certificate_path)
         self.sockproc.set_queues(self.output_queue, self.input_queue, self.log_queue)
         # After 3.3 it would be better to pass daemon as a kwarg in this constructor
         self.proc = multiprocessing.Process(
