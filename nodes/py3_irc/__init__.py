@@ -14,7 +14,8 @@ def msg_relay(cmd, channel, body):
             msg = body.get('message', 'Message missing?!')
             for s in servers:
                 if s.server == server and channel in s.channels:
-                    s.send_msg(channel, msg)
+                    for line in msg.split('\n'):
+                        s.send_msg(channel, line.strip())
                 else:
                     print("{} {} not in {}/{}".format(server, channel, s.server, repr(s.channels.keys())))
         else:

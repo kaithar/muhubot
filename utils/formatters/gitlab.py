@@ -40,7 +40,7 @@ def commits(commit):
     for ct in commit['commits']:
         msg += "\n%s: [%s] %s"%(
             ct['author']['name'], ct['id'][:9],
-            ct['message']
+            ct['message'].strip()
            )
     print(msg)
     return msg
