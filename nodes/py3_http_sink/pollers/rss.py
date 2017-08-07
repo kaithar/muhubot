@@ -5,6 +5,7 @@ import tornado
 from tornado import gen
 import threading
 import traceback
+import socket
 
 class RSS_poller(base.Periodic):
     timeout = 1000
@@ -108,6 +109,9 @@ class RSS_poller(base.Periodic):
                     t['seen'] = items
                     with open('cache/{}.json'.format(tag), 'w') as f:
                         json.dump(items, f, indent=2)
+                except socket.gaierror:
+                    print("Socket error for %s!"%tag)
+                    traceback.print_exc(None)
                 except:
                     print("Something went very wrong")
                     traceback.print_exc(None)
