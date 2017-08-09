@@ -8,6 +8,7 @@ import os
 import json
 import time
 import multiprocessing
+import logging
 
 try:
     import queue
