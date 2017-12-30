@@ -289,8 +289,10 @@ class Socket(object):
         self.start_thread()
 
     def tornado_register(self, ioloop):
+        import tornado.autoreload
         self.ioloop = ioloop
         self.call_safely = self.tornado_call_safely
+        tornado.autoreload.add_reload_hook(self.stop_thread)
         self.start_thread()
 
     def foreground(self):
