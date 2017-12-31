@@ -1,1 +1,1 @@
-from protocol import *
+from muhubot.protocol import *
