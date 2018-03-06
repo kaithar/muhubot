@@ -76,19 +76,23 @@ class SockProcess(object):
             self.socket.identity = iden
 
         while True:
-            self.log("Requesting port")
+            self.log("Loading socket")
             qsock = self.context.socket(zmq.REQ)
             client_secret_file = os.path.join(self.keys_dir, "client.key_secret")
+            self.log("Loading cert")
             client_public, client_secret = zmq.auth.load_certificate(client_secret_file)
             qsock.curve_secretkey = client_secret
             qsock.curve_publickey = client_public
 
             server_public_file = os.path.join(self.keys_dir, "server.key")
+            self.log("Loading cert 2")
             server_public, _ = zmq.auth.load_certificate(server_public_file)
             # The client must know the server's public key to make a CURVE connection.
             qsock.curve_serverkey = server_public
             qsock.set(zmq.LINGER, 1)
+            self.log("Connecting")
             qsock.connect(self.endpoint.format("5141"))
+            self.log("Requesting port")
             qsock.send(b'')
             if qsock.poll(timeout=10000):
                 port = int(qsock.recv())
