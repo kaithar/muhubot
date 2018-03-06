@@ -90,7 +90,7 @@ class SockProcess(object):
             qsock.set(zmq.LINGER, 1)
             qsock.connect(self.endpoint.format("5141"))
             qsock.send(b'')
-            if qsock.poll(timeout=1000):
+            if qsock.poll(timeout=10000):
                 port = int(qsock.recv())
                 self.log("Got port {}".format(port))
                 qsock.close()
