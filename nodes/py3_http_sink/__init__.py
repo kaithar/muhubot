@@ -3,17 +3,17 @@ import config
 
 if getattr(config, 'http_sink', False):
     my_config = {
-        'zmq_endpoint': getattr(config, 'zmq_endpoint', 'tcp://127.0.0.1:{}'),
+        'broker': getattr(config, 'broker', '127.0.0.1'),
         'node_name': 'http_sink',
         'port': 8808,
         'sinks': [], 'pollers': [], 'apis': []
     }
     my_config.update(config.http_sink)
-    zmq_sock = Socket(my_config['node_name'], my_config['zmq_endpoint'], './client_certs')
+    protocolsock = Socket(my_config['node_name'], my_config['broker'], './certificates')
 
     import tornado.ioloop
     ioloop = tornado.ioloop.IOLoop.current()
-    zmq_sock.tornado_register(ioloop)
+    protocolsock.tornado_register(ioloop)
 
     from .base import Periodic, Api
     import importlib
@@ -41,7 +41,7 @@ if getattr(config, 'http_sink', False):
                     o = getattr(s, on)
                     if (type(o) == type) and (issubclass(o, tornado.web.RequestHandler)):
                         print("Binding {} to {}".format(o, o.path))
-                        o.sock = zmq_sock
+                        o.sock = protocolsock
                         sink_handlers.append((o.path, o))
 
         for poller in my_config['pollers']:
@@ -60,7 +60,7 @@ if getattr(config, 'http_sink', False):
                     o = getattr(s, on)
                     if (type(o) == type) and (issubclass(o, Periodic)):
                         print("Creating poller {} for every {}ms".format(o, o.timeout))
-                        o.sock = zmq_sock
+                        o.sock = protocolsock
                         cb = o()
                         print("Adding t.i.PC")
                         pc = tornado.ioloop.PeriodicCallback(cb.run, o.timeout)
@@ -82,7 +82,7 @@ if getattr(config, 'http_sink', False):
                     o = getattr(s, on)
                     if (type(o) == type) and (issubclass(o, Api)):
                         print("Creating api {}".format(o))
-                        o.sock = zmq_sock
+                        o.sock = protocolsock
                         cb = o()
  
 

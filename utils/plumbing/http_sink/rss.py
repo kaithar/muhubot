@@ -16,6 +16,7 @@ cid = 0
 
 def rss_receiver(cmd, channel, body):
     # {'tag': 'xkcd', 'item': rss_item}
+    body = json.loads(body)
     asc = body.get('tag', None)
     cbs = callbacks.get(asc, None)
     if cbs:
@@ -39,6 +40,7 @@ def poll_feed(tag, url, period = 10*60):
 
 def rss_config(cmd, channel, body):
     global feeds
+    body = json.loads(body)
     sock.get_sock().send_multipart('MSG', body['requesting'], json.dumps(feeds))
 
 def force_feed(body):

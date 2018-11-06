@@ -3,9 +3,10 @@ import textwrap
 import curses
 import sys
 
-import msgpack
-import ssl
-import socket
+import zmq
+
+print(zmq.zmq_version_info())
+print(zmq.pyzmq_version_info())
 
 class server(object):
     def __init__(self):
@@ -13,6 +14,10 @@ class server(object):
         self.servers = {}
 
     def log_print(self, indent, msg):
+        try:
+            indent = indent.decode()
+        except:
+            pass
         self.textwrapper.initial_indent = '{:22}'.format(indent)
         self.textwrapper.subsequent_indent = ' '*max(22,len(indent))
         lines = self.textwrapper.wrap(msg)
@@ -41,32 +46,24 @@ class server(object):
     def loop(self, csrcn):
         self.csrcn = csrcn
         self.setup_screen()
-
-        sslctx = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS)
-        sslctx.load_cert_chain('certificates/client.crt', 'certificates/client.key')
-        sslctx.load_verify_locations('certificates/ca.crt')
-
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        ssl_sock = sslctx.wrap_socket(sock)
-        ssl_sock.connect(('127.0.0.1', 6161))
-        msgpack.pack(['CONNECT', 'brokermon'], ssl_sock)
-        msgpack.pack(['LOGMON'], ssl_sock)
-        unpacker = msgpack.Unpacker(raw=False)
+        ctx = zmq.Context()
+        subby = ctx.socket(zmq.SUB)
+        subby.bind('tcp://127.0.0.1:5142')
+        subby.setsockopt(zmq.SUBSCRIBE, b"PING")
+        subby.setsockopt(zmq.SUBSCRIBE, b"PONG")
+        subby.setsockopt(zmq.SUBSCRIBE, b"TICKER")
+        subby.setsockopt(zmq.SUBSCRIBE, b"LOG")
 
         while True:
-            data = ssl_sock.read(10000)
-            if not data:
-                return
-            unpacker.feed(data)
-            for pkt in unpacker:
-                if pkt[0] == 'PING':
-                    self.csrcn.insstr(8, 7, '{:15}'.format(pkt[1]))
-                elif pkt[0] == 'PONG':
-                    self.csrcn.insstr(9, 7, '{:15}'.format(pkt[1]))
-                elif pkt[0] == 'TICKER':
-                    self.csrcn.insstr(7, 7, pkt[1])
-                elif pkt[0] == 'LOG':
-                    self.log_print(pkt[1], pkt[2])
+            pkt = subby.recv_multipart()
+            if pkt[0] == b'PING':
+                self.csrcn.insstr(8, 7, '{:15}'.format(pkt[1].decode()))
+            elif pkt[0] == b'PONG':
+                self.csrcn.insstr(9, 7, '{:15}'.format(pkt[1].decode()))
+            elif pkt[0] == b'TICKER':
+                self.csrcn.insstr(7, 7, pkt[1].decode())
+            elif pkt[0] == b'LOG':
+                self.log_print(pkt[1].decode(), pkt[2].decode())
             self.csrcn.refresh()
 
 s = server()

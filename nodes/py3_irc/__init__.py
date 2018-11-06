@@ -26,7 +26,7 @@ def msg_relay(cmd, channel, body):
 # This stack of nested if/else statements would likely be better refactored to use exceptions.
 if getattr(config, 'irc', False):
     my_config = {
-        'zmq_endpoint': getattr(config, 'zmq_endpoint', 'tcp://127.0.0.1:{}'),
+        'broker': getattr(config, 'broker', '127.0.0.1'),
         'node_name': 'irc',
         'nickname': 'muhubot',
         'servers': []
@@ -34,7 +34,7 @@ if getattr(config, 'irc', False):
     my_config.update(config.irc)
     if my_config['servers']:
         print('Configuring for {} servers'.format(len(my_config['servers'])))
-        zmq_sock = Socket(my_config['node_name'], my_config['zmq_endpoint'], './client_certs')
+        zmq_sock = Socket(my_config['node_name'], my_config['broker'], './certificates')
         import tornado.ioloop
         ioloop = tornado.ioloop.IOLoop.current()
         zmq_sock.tornado_register(ioloop)

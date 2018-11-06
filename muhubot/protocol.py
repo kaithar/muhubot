@@ -1,21 +1,17 @@
 from __future__ import print_function, unicode_literals
-import zmq
-import zmq.auth
-from zmq.auth.thread import ThreadAuthenticator
-from zmq.utils.monitor import recv_monitor_message
 import sys
 import os
-import json
 import time
 import multiprocessing
 import logging
+import msgpack
+import ssl
+import socket
 
 try:
     import queue
 except ImportError:
     import Queue as queue
-
-EVENT_MAP = {}
 
 class SockProcess(object):
     if (sys.version_info.major == 3):
@@ -27,6 +23,7 @@ class SockProcess(object):
     identity = ""
     endpoint = ""
     socket = None
+    sslctx = None
 
     last_activity = 0
 
@@ -48,64 +45,36 @@ class SockProcess(object):
         print(message)
         self.log_queue.put(message)
 
-    def create_socket(self):
+    def create_context(self):
         self.log("Creating context")
-        self.context = zmq.Context()
-        self.log("Creating socket")
-        self.socket = self.context.socket(zmq.DEALER)
-        # Based on ironhouse.py
-        client_secret_file = os.path.join(self.keys_dir, "client.key_secret")
-        client_public, client_secret = zmq.auth.load_certificate(client_secret_file)
-        self.socket.curve_secretkey = client_secret
-        self.socket.curve_publickey = client_public
-
-        server_public_file = os.path.join(self.keys_dir, "server.key")
-        server_public, _ = zmq.auth.load_certificate(server_public_file)
-        # The client must know the server's public key to make a CURVE connection.
-        self.socket.curve_serverkey = server_public
-        self.log("Creating monitor")
-        self.monitor = self.socket.get_monitor_socket()
-
+        self.sslctx = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS)
+        self.sslctx.load_cert_chain(os.path.join(self.keys_dir, "client.crt"), os.path.join(self.keys_dir, "client.key"))
+        self.sslctx.load_verify_locations(os.path.join(self.keys_dir, "ca.crt"))
+    
     def _connect(self):
         num = int(time.time())%100
         iden = "{}_{}".format(self.identity, num)
         self.log("Connecting as {}".format(iden))
-        if (sys.version_info.major == 3 or type(iden) is self.desired_type):
-            self.socket.identity = iden.encode('utf-8')
-        else:
-            self.socket.identity = iden
+        self.cur_identity = iden
+        #if (sys.version_info.major == 3 or type(iden) is self.desired_type):
+        #    self.socket.identity = iden.encode('utf-8')
+        #else:
+        #    self.socket.identity = iden
 
-        while True:
-            self.log("Loading socket")
-            qsock = self.context.socket(zmq.REQ)
-            client_secret_file = os.path.join(self.keys_dir, "client.key_secret")
-            self.log("Loading cert")
-            client_public, client_secret = zmq.auth.load_certificate(client_secret_file)
-            qsock.curve_secretkey = client_secret
-            qsock.curve_publickey = client_public
-
-            server_public_file = os.path.join(self.keys_dir, "server.key")
-            self.log("Loading cert 2")
-            server_public, _ = zmq.auth.load_certificate(server_public_file)
-            # The client must know the server's public key to make a CURVE connection.
-            qsock.curve_serverkey = server_public
-            qsock.set(zmq.LINGER, 1)
-            self.log("Connecting")
-            qsock.connect(self.endpoint.format("5141"))
-            self.log("Requesting port")
-            qsock.send(b'')
-            if qsock.poll(timeout=10000):
-                port = int(qsock.recv())
-                self.log("Got port {}".format(port))
-                qsock.close()
-                break
-            else:
-                self.log("Timeout requesting port")
-                qsock.close()
-
-        self.socket.connect(self.endpoint.format(port))
-        self.log("Socket connect requested")
+        self.log("Loading socket")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        ssl_sock = self.sslctx.wrap_socket(sock)
+        ssl_sock.connect((self.endpoint, 6161))
+        self.socket = ssl_sock
+        ssl_sock.settimeout(0.1)
         self.last_activity = time.time()
+        self.connected = True
+        self.send_multipart('CONNECT', iden)
+        for c in self.subs:
+            self.send_multipart('SUB', c)
+        while self.message_queue:
+            self.raw_send_multipart(self.message_queue.pop(0))
+
 
     def connect(self, identity, endpoint):
         self.identity = identity
@@ -117,17 +86,17 @@ class SockProcess(object):
         self.connected = False
         if self.socket:
             self.log("Closing socket")
-            self.socket.close(1)
-            self.log("Destroying context")
-            self.context.destroy(1)
-        self.create_socket()
+            self.socket.close()
+        if not self.sslctx:
+            self.create_context()
         self._connect()
+        self.unpacker = msgpack.Unpacker(raw=False)
 
     def raw_send_multipart(self, safe_args):
         if self.connected:
             if (safe_args[0] != b'PONG'):
                 self.log('SENDING TO {}: {}'.format(safe_args[0], repr(safe_args[1:])[0:100]))
-            self.socket.send_multipart(safe_args)
+            msgpack.pack(safe_args, self.socket)
         else:
             self.log('QUEUED FOR {}: {}'.format(safe_args[0], repr(safe_args[1:])[0:100]))
             self.message_queue.append(safe_args)
@@ -155,71 +124,41 @@ class SockProcess(object):
     def main_loop(self, identity, endpoint):
         print('In proc')
         self.connect(identity, endpoint)
-        try:
-            while True:
-                # First the outgoing instructions...
-                try:
-                    command = self.input_queue.get(False)
-                    # Command is like ('SUB', channel)
-                    handler = getattr(self, 'send_{}'.format(command[0].upper()), None)
-                    if handler:
-                        handler(*command[1:])
-                    else:
-                        self.send_multipart(*command)
-                except queue.Empty:
-                    pass # Nothing to pull
-                
-                # Now the incoming
-                nowish = time.time()
-                if (self.socket.poll(timeout=100)):
+        while True:
+            # First the outgoing instructions...
+            try:
+                command = self.input_queue.get(False)
+                # Command is like ('SUB', channel)
+                handler = getattr(self, 'send_{}'.format(command[0].upper()), None)
+                if handler:
+                    handler(*command[1:])
+                else:
+                    self.send_multipart(*command)
+            except queue.Empty:
+                pass # Nothing to pull
+            
+            # Now the incoming
+            nowish = time.time()
+            try:
+                inc = self.socket.read()
+                self.unpacker.feed(inc)
+                for data in self.unpacker:
                     self.last_activity = nowish
-                    data = self.socket.recv_multipart()
-                    if (sys.version_info.major == 3):
-                        safe_data = [d.decode('utf-8') for d in data]
-                    else:
-                        safe_data = [d for d in data]
+                    if (data[0] != 'PING'):
+                        self.log(repr(data)[0:100])
 
-                    if (safe_data[0] != 'PING'):
-                        self.log(repr(safe_data)[0:100])
-
-                    handler = getattr(self, 'handle_{}'.format(safe_data[0]), None)
+                    handler = getattr(self, 'handle_{}'.format(data[0]), None)
                     if handler:
-                        handler(*safe_data)
+                        handler(*data)
                     else:
-                        self.output_queue.put(safe_data)
+                        self.output_queue.put(data)
+            except socket.timeout:
+                pass
 
-                # Did the server go quiet?
-                if (nowish - 30 > self.last_activity):
-                    self.log('No recent activity, reconnecting!')
-                    self.reconnect()
-                
-                # Check for useful events
-                if (self.monitor.closed == False and self.monitor.poll(timeout=100)):
-                    evt = recv_monitor_message(self.monitor)
-                    evt.update({'description': EVENT_MAP[evt['event']]})
-                    if evt['event'] not in (zmq.EVENT_CONNECT_RETRIED,
-                                            zmq.EVENT_CONNECT_DELAYED,
-                                            zmq.EVENT_CLOSED):
-                        # Completely ignore these 3 events because they spam too much.
-                        self.log("Event: {}".format(evt))
-                        if evt['event'] == zmq.EVENT_CONNECTED:
-                            self.connected = True
-                            self.send_multipart('CONNECT')
-                            for c in self.subs:
-                                self.send_multipart('SUB', c)
-                            while self.message_queue:
-                                self.raw_send_multipart(self.message_queue.pop(0))
-                        if evt['event'] == zmq.EVENT_DISCONNECTED:
-                            self.log('DISCONNECT')
-                            self.reconnect()
-                        if evt['event'] == zmq.EVENT_MONITOR_STOPPED:
-                            break
-        except zmq.ZMQError as e:
-            self.log('Exception!')
-            if e.errno == zmq.ETERM:
-                pass           # Interrupted
-            else:
-                raise
+            # Did the server go quiet?
+            if (nowish - 30 > self.last_activity):
+                self.log('No recent activity, reconnecting!')
+                self.reconnect()
         self.log('Exiting thread!')
 
 
@@ -228,11 +167,6 @@ class Socket(object):
     subs = None
 
     def __init__(self, identity, endpoint, certificate_path, delayStart=False):
-        global EVENT_MAP
-        for name in dir(zmq):
-            if name.startswith('EVENT_'):
-                value = getattr(zmq, name)
-                EVENT_MAP[value] = name
         m = multiprocessing.Manager()
         self.manager = m
         # For sanity the input and output queues are reversed on the other end
@@ -336,7 +270,7 @@ class Socket(object):
     def handle_MSG(self, cmd, chan, body):
         cb = self.subs.get(chan, None)
         if cb:
-            cb(cmd, chan, json.loads(body))
+            cb(cmd, chan, body)
 
     def thread(self):
         print('in thread')
@@ -372,7 +306,7 @@ class Socket(object):
         self.output_queue.put(args)
 
     def msg(self, channel, message):
-        self.send_multipart('MSG', channel, json.dumps(message))
+        self.send_multipart('MSG', channel, message)
 
     def msgstat(self, count):
         self.send_multipart('MSGSTAT', 'OK', count)

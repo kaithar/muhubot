@@ -20,6 +20,7 @@ class RSS_poller(base.Periodic):
 
     def force_tag(self, cmd, channel, body):
         # body = {'tag': 'bleh'}
+        body = json.loads(body)
         tag = body.get('tag', None)
         if tag and tag in self.targets:
             self.targets[tag]['due'] = 0
@@ -27,6 +28,7 @@ class RSS_poller(base.Periodic):
 
     def do_config(self, cmd, channel, body):
         # body = {'xkcd': {'feed': 'https://www.xkcd.com/atom.xml', 'period': 10*60}}
+        body = json.loads(body)
         if not self.lock.acquire():
             print("No lock")
             return
