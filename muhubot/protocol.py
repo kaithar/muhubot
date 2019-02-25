@@ -7,6 +7,7 @@ import logging
 import msgpack
 import ssl
 import socket
+import traceback
 
 try:
     import queue
@@ -89,7 +90,15 @@ class SockProcess(object):
             self.socket.close()
         if not self.sslctx:
             self.create_context()
-        self._connect()
+        try:
+            self._connect()
+        except ConnectionRefusedError:
+            print("Connection refused!")
+            return
+        except:
+            print("Error!")
+            traceback.print_exc()
+            return
         self.unpacker = msgpack.Unpacker(raw=False)
 
     def raw_send_multipart(self, safe_args):
@@ -153,6 +162,10 @@ class SockProcess(object):
                     else:
                         self.output_queue.put(data)
             except socket.timeout:
+                pass
+            except:
+                print("Exception!")
+                self.last_activity = nowish - 15
                 pass
 
             # Did the server go quiet?
