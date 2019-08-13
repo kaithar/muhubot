@@ -149,7 +149,12 @@ class SockProcess(object):
             # Now the incoming
             nowish = time.time()
             try:
-                inc = self.socket.read()
+                try:
+                    inc = self.socket.read()
+                except ValueError:
+                    self.log('ValueError, reconnecting!')
+                    self.reconnect()
+                    continue
                 self.unpacker.feed(inc)
                 for data in self.unpacker:
                     self.last_activity = nowish
@@ -165,6 +170,7 @@ class SockProcess(object):
                 pass
             except:
                 print("Exception!")
+                traceback.print_exc()
                 self.last_activity = nowish - 15
                 pass
 
@@ -290,7 +296,7 @@ class Socket(object):
         while self.running:
             try:
                 msg = self.log_queue.get(False)
-                print("(proc) "+msg)
+                print("(thread) "+msg)
             except queue.Empty:
                 pass # Nothing to pull
             except EOFError:
