@@ -137,7 +137,7 @@ class SockProcess(object):
         print('In proc')
         self.running.wait()
         self.connect(identity, endpoint)
-        while True:
+        while self.running.is_set():
             # First the outgoing instructions...
             try:
                 command = self.input_queue.get(False)
@@ -322,6 +322,7 @@ class Socket(object):
                 break
 
             time.sleep(0.05)
+        print('Thread waiting!')
         self.proc.join()
         print('Exiting thread!')
 
