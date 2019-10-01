@@ -42,6 +42,9 @@ class SockProcess(object):
         self.output_queue = output_queue
         self.log_queue = log_queue
 
+    def set_running(self, running):
+        self.running = running
+
     def log(self, message):
         print(message)
         self.log_queue.put(message)
@@ -132,6 +135,7 @@ class SockProcess(object):
 
     def main_loop(self, identity, endpoint):
         print('In proc')
+        self.running.wait()
         self.connect(identity, endpoint)
         while True:
             # First the outgoing instructions...
@@ -194,8 +198,11 @@ class Socket(object):
         self.input_queue = m.Queue()
         self.output_queue = m.Queue()
         self.log_queue = m.Queue()
+        self.running = m.Event()
+        self.running.set()
         self.sockproc = SockProcess(certificate_path)
         self.sockproc.set_queues(self.output_queue, self.input_queue, self.log_queue)
+        self.sockproc.set_running(self.running)
         # After 3.3 it would be better to pass daemon as a kwarg in this constructor
         self.proc = multiprocessing.Process(
             target=self.sockproc.main_loop,
@@ -213,7 +220,6 @@ class Socket(object):
     ###
 
     def start_thread(self):
-        self.running = True
         import threading
         self._thread = threading.Thread(target=self.thread)
         self._thread.setDaemon(True)
@@ -221,7 +227,7 @@ class Socket(object):
 
     def stop_thread(self):
         print('Stopping')
-        self.running = False
+        self.running.clear()
         self._thread.join()
 
 
@@ -254,7 +260,7 @@ class Socket(object):
 
     def foreground(self):
         self.call_safely = self.direct_call_safely
-        self.running = True
+        self.running.set()
         self.thread()
 
     ###
@@ -293,7 +299,7 @@ class Socket(object):
 
     def thread(self):
         print('in thread')
-        while self.running:
+        while self.running.is_set():
             try:
                 msg = self.log_queue.get(False)
                 print("(thread) "+msg)
@@ -316,7 +322,7 @@ class Socket(object):
                 break
 
             time.sleep(0.05)
-
+        self.proc.join()
         print('Exiting thread!')
 
     ###
