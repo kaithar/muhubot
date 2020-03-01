@@ -106,7 +106,7 @@ class SockProcess(object):
 
     def raw_send_multipart(self, safe_args):
         if self.connected:
-            if (safe_args[0] != b'PONG'):
+            if (safe_args[0] != 'PONG'):
                 self.log('SENDING TO {}: {}'.format(safe_args[0], repr(safe_args[1:])[0:100]))
             msgpack.pack(safe_args, self.socket)
         else:
@@ -114,8 +114,8 @@ class SockProcess(object):
             self.message_queue.append(safe_args)
 
     def send_multipart(self, *args):
-        safe_args = [(a.encode('utf-8', 'backslashreplace') if (type(a) is self.desired_type) else a) for a in args]
-        self.raw_send_multipart(safe_args)
+        #safe_args = [(a.encode('utf-8', 'backslashreplace') if (type(a) is self.desired_type) else a) for a in args]
+        self.raw_send_multipart(args)
 
     def send_SUB(self, channel):
         channel = channel.lower()

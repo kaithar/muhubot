@@ -2,3 +2,4 @@ pyzmq
 tornado
 feedparser
 pydle
+msgpack
